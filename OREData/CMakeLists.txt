@@ -18,7 +18,7 @@ else()
 endif()
 find_package (Boost REQUIRED COMPONENTS ${COMPONENTS_CONDITIONAL} regex system date_time serialization filesystem timer log OPTIONAL_COMPONENTS chrono)
 
-include_directories(${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(${QUANTLIB_SOURCE_DIR})
 include_directories(${QUANTEXT_SOURCE_DIR})
 include_directories(${ORETEST_SOURCE_DIR})

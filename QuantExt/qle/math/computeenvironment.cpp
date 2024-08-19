@@ -19,6 +19,7 @@
 #include <qle/math/computeenvironment.hpp>
 
 #include <boost/algorithm/string/join.hpp>
+#include <boost/thread/lock_types.hpp>
 
 #include <ql/errors.hpp>
 
