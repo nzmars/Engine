@@ -80,6 +80,8 @@ ${CMAKE} -B $BUILD                                            \
          -DBUILD_SHARED_LIBS=OFF                              \
          -DBOOST_ROOT=${BOOST_INC} -DBoost_ROOT=${BOOST_INC}  \
          -DBoost_NO_SYSTEM_PATHS=ON                           \
+         -DCMAKE_INSTALL_PREFIX=$ORE                          \
+         -DCMAKE_BUILD_TYPE=$BUILD_TYPE                       \
          -DBOOST_LIBRARYDIR=${BOOST_LIB}
 fi
 
@@ -88,10 +90,10 @@ if [ $# -gt 0 ]; then
   for var in "$@"
   do
     echo INFO === build project with $var
-    ${CMAKE} --build ${BUILD} --parallel ${CPU_N} --verbose --target $var
+    ${CMAKE} --build ${BUILD} --parallel ${CPU_N} --verbose --target $var --config $BUILD_TYPE
   done
 else
-  ${CMAKE} --build ${BUILD} --parallel ${CPU_N} --verbose
+  ${CMAKE} --build ${BUILD} --parallel ${CPU_N} --verbose --config $BUILD_TYPE
 fi
 
 # unset CC

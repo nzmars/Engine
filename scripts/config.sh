@@ -3,8 +3,8 @@
 # find_package(Python REQUIRED COMPONENTS Development)
 # sudo apt-get install python3-dev
 
-export CC=/usr/bin/gcc-10
-export CXX=/usr/bin/g++-10
+export CC=/usr/bin/gcc
+export CXX=/usr/bin/g++
 export ORE=`pwd -P`                 # required
 ORE_ROOT_DIR=$ORE
 ORE_DIR=$ORE_ROOT_DIR
