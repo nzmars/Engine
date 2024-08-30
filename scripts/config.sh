@@ -8,10 +8,10 @@ export CXX=/usr/bin/g++
 export ORE=`pwd -P`                 # required
 ORE_ROOT_DIR=$ORE
 ORE_DIR=$ORE_ROOT_DIR
-ORE_SWIG_DIR=$ORE_DIR/../ORE-SWIG
+ORE_SWIG_DIR=`realpath ../ORE-SWIG`
 
 
-BOOST_ROOT=/mnt/d/code/model/ore/linux/boost_1_86_0
+BOOST_ROOT=`realpath ../boost_1_86_0`
 BOOST=$BOOST_ROOT
 export BOOST_INC=$BOOST             # required
 export BOOST_LIB=$BOOST/stage/lib   # required

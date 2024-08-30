@@ -13,7 +13,8 @@ log() {
 echo "CPU_N=${CPU_N}"
 
 if [ $flag_use_vcpkg -eq 1 ]; then
-  VCPKG_ROOT=/mnt/d/code/model/ore/vcpkg
+  VCPKG_ROOT=`realpath ../vcpkg`
+  echo VCPKG_ROOT=$VCPKG_ROOT
 else
   echo BOOST_INC=${BOOST_ROOT}
   echo BOOST_LIB=${BOOST_INC}/stage/lib
