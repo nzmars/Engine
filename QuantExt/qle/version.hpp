@@ -43,7 +43,7 @@
 #endif
 
 //! Version string
-#define OPEN_SOURCE_RISK_VERSION "1.8.12.1"
+#define OPEN_SOURCE_RISK_VERSION "1.8.12.1" "_" __DATE__ "_" __TIME__
 
 //! Version number
 #define OPEN_SOURCE_RISK_VERSION_NUM 1081200
