@@ -6,8 +6,11 @@ if not defined SWIG_DIR (
 
 echo "SWIG_DIR=%SWIG_DIR%"
 
+set ORE_ROOT_DIR=%CD%
 set ORE_ROOT_DIR=D:\code\model\ore\Engine
-set ORE_SWIG_DIR=D:\code\model\ore\ORE-SWIG
+
+set ORE_SWIG_DIR=%ORE_ROOT_DIR%\..\ORE-SWIG
+echo ORE_ROOT_DIR=%ORE_ROOT_DIR%
 
 set ORE_DIR=%ORE_ROOT_DIR%
 
@@ -17,7 +20,8 @@ set PATH=%SWIG_DIR%;%PATH%
 cmake --version
 
 if not defined BOOST_ROOT (
-  set BOOST_ROOT=d:\code\model\ore\boost_1_86_0
+  set BOOST_ROOT=%ORE_ROOT_DIR%\..\boost_1_86_0
+  REM  set BOOST_ROOT=d:\code\model\ore\boost_1_86_0
 ) 
 echo "BOOST_ROOT=%BOOST_ROOT%"
 
@@ -28,10 +32,14 @@ set BOOST_LIBRARYDIR=%BOOST_LIB%
 
 set GENERATOR="Visual Studio 17 2022"
 set BUILD=build
+set QL_ENABLE_SESSIONS=ON
+set QL_ENABLE_TRACING=ON
+set QL_USE_STD_CLASSES=OFF
 
 set WINVER=0x0A00
 
 set BUILD_TYPE=Release
+set BUILD_TYPE=RelWithDebInfo
 
 
 REM ----------------------------------------

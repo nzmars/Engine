@@ -24,9 +24,11 @@ cmake.exe -B %BUILD% -G %GENERATOR% -A x64                  ^
          -DQL_BUILD_BENCHMARK=OFF                           ^
          -DQL_BUILD_EXAMPLES=OFF                            ^
          -DQL_BUILD_TEST_SUITE=OFF                          ^
-         -DQL_ENABLE_SESSIONS=ON                            ^
-         -DQL_USE_STD_CLASSES=OFF                           ^
+         -DQL_ENABLE_SESSIONS=%QL_ENABLE_SESSIONS%          ^
+         -DQL_ENABLE_TRACING=%QL_ENABLE_TRACING%            ^
+         -DQL_USE_STD_CLASSES=%QL_USE_STD_CLASSES%          ^
          -DWINVER=%WINVER%                                  ^
+         -DCMAKE_BUILD_TYPE=%BUILD_TYPE%                    ^
          -DMSVC_LINK_DYNAMIC_RUNTIME=false
 
 cmake.exe --build %BUILD% --parallel 8 --config %BUILD_TYPE% --verbose

@@ -15,6 +15,10 @@ cmake -Wno-dev -B %BUILD% -G %GENERATOR% -A x64                                 
         -DMSVC_LINK_DYNAMIC_RUNTIME=OFF -DORE_USE_ZLIB=OFF -DBoost_NO_SYSTEM_PATHS=ON   ^
         -DBOOST_LIBRARYDIR=%BOOST_LIBRARYDIR%                                           ^
         -DBOOST_ROOT=%BOOST% -DBoost_ROOT=%BOOST%                                       ^
+        -DQL_ENABLE_SESSIONS=%QL_ENABLE_SESSIONS%                                       ^
+        -DQL_ENABLE_TRACING=%QL_ENABLE_TRACING%                                         ^
+        -DQL_USE_STD_CLASSES=%QL_USE_STD_CLASSES%                                       ^
+        -DCMAKE_BUILD_TYPE=%BUILD_TYPE%                                                 ^
         -DWINVER=%WINVER%                                  
 
 cmake --build %BUILD% --parallel 8 --config %BUILD_TYPE% --verbose
