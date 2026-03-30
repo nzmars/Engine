@@ -36,6 +36,7 @@
 #include <ql/time/calendars/unitedkingdom.hpp>
 #include <ql/time/daycounters/actual365fixed.hpp>
 #include <ql/time/daycounters/actualactual.hpp>
+#include <qle/utilities/inflation.hpp>
 
 using namespace QuantLib;
 using namespace boost::unit_test_framework;
@@ -142,17 +143,18 @@ public:
             Handle<Quote> quote(QuantLib::ext::shared_ptr<Quote>(new SimpleQuote(ratesZCII[i] / 100.0)));
             QuantLib::ext::shared_ptr<BootstrapHelper<ZeroInflationTermStructure>> anInstrument(
                 new ZeroCouponInflationSwapHelper(
-                    quote, Period(2, Months), datesZCII[i], UnitedKingdom(), ModifiedFollowing, ActualActual(ActualActual::ISDA), ii,
-                    CPI::AsIndex, yieldCurves_.at(make_tuple(Market::defaultConfiguration, YieldCurveType::Discount, "GBP"))));
+                    quote, Period(2, Months), asof_, datesZCII[i], UnitedKingdom(), ModifiedFollowing, ActualActual(ActualActual::ISDA), ii,
+                    CPI::AsIndex));
             ;
             instruments.push_back(anInstrument);
         };
         // we can use historical or first ZCIIS for this
         // we know historical is WAY off market-implied, so use market implied flat.
-        Rate baseZeroRate = ratesZCII[0] / 100.0;
+        auto obsLag = Period(2, Months);
+        auto frequency = ii->frequency();
+        Date baseDate = QuantExt::ZeroInflation::curveBaseDate(false, asof_, obsLag, frequency, ii);
         QuantLib::ext::shared_ptr<PiecewiseZeroInflationCurve<Linear>> pCPIts(new PiecewiseZeroInflationCurve<Linear>(
-            asof_, UnitedKingdom(), ActualActual(ActualActual::ISDA), Period(2, Months), ii->frequency(),
-            baseZeroRate, instruments));
+            asof_, baseDate, obsLag, frequency, ActualActual(ActualActual::ISDA), instruments));
         pCPIts->recalculate();
         cpiTS = QuantLib::ext::dynamic_pointer_cast<ZeroInflationTermStructure>(pCPIts);
         hUKRPI = Handle<ZeroInflationIndex>(

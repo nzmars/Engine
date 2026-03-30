@@ -19,6 +19,7 @@
 #include <orea/engine/marketriskbacktest.hpp>
 #include <qle/math/stoplightbounds.hpp>
 #include <ored/marketdata/todaysmarket.hpp>
+#include <ored/portfolio/structuredconfigurationwarning.hpp>
 #include <ored/report/report.hpp>
 #include <ored/utilities/to_string.hpp>
 #include <orea/cube/cubewriter.hpp>
@@ -55,10 +56,11 @@ MarketRiskBacktest::MarketRiskBacktest(
     std::unique_ptr<MultiThreadArgs> mtArgs,
     const ext::shared_ptr<HistoricalScenarioGenerator>& hisScenGen,
     const bool breakdown,
-    const bool requireTradePnl)
+    const bool requireTradePnl,
+    const QuantLib::ext::shared_ptr<TodaysMarketParameters>& marketConfig)
     : MarketRiskReport(calculationCurrency, portfolio, portfolioFilter, btArgs->backtestPeriod_, hisScenGen, std::move(sensiArgs), std::move(revalArgs),
                        std::move(mtArgs), breakdown, requireTradePnl),
-      btArgs_(std::move(btArgs)) {
+      btArgs_(std::move(btArgs)), todaysmarket_(marketConfig) {
 }
 
 void MarketRiskBacktest::initialise() {
@@ -105,7 +107,7 @@ void MarketRiskBacktest::handleSensiResults(const ext::shared_ptr<MarketRiskRepo
     sensiPnls_ = pnlCalculators_[1]->pnls();
     foSensiPnls_ = pnlCalculators_[1]->foPnls();
 
-    auto backtestPnlCalc = ext::dynamic_pointer_cast < BacktestPNLCalculator>(pnlCalculators_[1]);
+    auto backtestPnlCalc = ext::dynamic_pointer_cast<BacktestPNLCalculator>(pnlCalculators_[1]);
     QL_REQUIRE(backtestPnlCalc, "We must have a BacktestPnLCalculator");
     if (runTradeDetail(reports)) {
         foTradePnls_ = backtestPnlCalc->foTradePnls();
@@ -157,16 +159,20 @@ void MarketRiskBacktest::writeReports(const QuantLib::ext::shared_ptr<MarketRisk
 
         // Write the rows in the summary report
         addSummaryRow(backtestRpts, data, true, srFull.callValue, srFull.observations, true, srFull.callExceptions,
-                      srFull.bounds, sensiCallBenchmarks_, fullRevalCallBenchmarks_);
+                      srFull.bounds, srFull.callExceptionsDecorrelated, srFull.boundsDecorrelated, sensiCallBenchmarks_,
+                      fullRevalCallBenchmarks_);
         addSummaryRow(backtestRpts, data, false, srFull.postValue, srFull.observations, true, srFull.postExceptions,
-                      srFull.bounds, sensiPostBenchmarks_, fullRevalPostBenchmarks_);
+                      srFull.bounds, srFull.postExceptionsDecorrelated, srFull.boundsDecorrelated, sensiPostBenchmarks_,
+                      fullRevalPostBenchmarks_);
     }
 
      if (runSensi) {
-        addSummaryRow(backtestRpts, data, true, srSensi.callValue, srSensi.observations, false, srSensi.callExceptions,
-                      srSensi.bounds, sensiCallBenchmarks_, fullRevalCallBenchmarks_);
-        addSummaryRow(backtestRpts, data, false, srSensi.postValue, srSensi.observations, false, srSensi.postExceptions,
-                      srSensi.bounds, sensiPostBenchmarks_, fullRevalPostBenchmarks_);
+         addSummaryRow(backtestRpts, data, true, srSensi.callValue, srSensi.observations, false, srSensi.callExceptions,
+                       srSensi.bounds, srSensi.callExceptionsDecorrelated, srSensi.boundsDecorrelated,
+                       sensiCallBenchmarks_, fullRevalCallBenchmarks_);
+         addSummaryRow(backtestRpts, data, false, srSensi.postValue, srSensi.observations, false,
+                       srSensi.postExceptions, srSensi.bounds, srSensi.postExceptionsDecorrelated,
+                       srSensi.boundsDecorrelated, sensiPostBenchmarks_, fullRevalPostBenchmarks_);
     }
 }
 
@@ -185,10 +191,10 @@ MarketRiskBacktest::SummaryResults MarketRiskBacktest::calculateSummary(
     const ext::shared_ptr<BacktestReports>& reports, const Data& data, bool isFull, const vector<Real>& pnls, 
     const vector<string>& tradeIds, const PNLCalculator::TradePnLStore& tradePnls) {
 
-    SummaryResults sr = {pnls.size(), 0.0, 0, 0.0, 0, {}};
+    SummaryResults sr = {pnls.size(), 0.0, 0, 0.0, 0, {}, 0, 0, {}};
 
     sr.callValue = callValue(data);
-    sr.postValue = postValue(data);    
+    sr.postValue = postValue(data);
 
     auto pnlScenDates = hisScenGen_->filteredScenarioDates(btArgs_->backtestPeriod_);
     QL_REQUIRE(pnlScenDates.size() == pnls.size(), "Backtest::calculateSummary(): internal error, pnlScenDates ("
@@ -217,71 +223,114 @@ MarketRiskBacktest::SummaryResults MarketRiskBacktest::calculateSummary(
         }
     }
 
-    Real callScenPnl;
-    Real postScenPnl;
-    vector<Real> scenTradePnls;
-    string cPassFail;
-    string pPassFail;
+    // populate call and post pnls
+    vector<Real> callScenPnls;
+    vector<Real> postScenPnls;
+    for (Size i = 0; i < pnls.size(); i++) {
+        callScenPnls.push_back(pnls[i]);
+        if (!callTradesToSkip.empty()) {
+            for (const Size t : callTradesToSkip) {
+                callScenPnls.back() -= tradePnls[i][t];
+            }
+        }
+        postScenPnls.push_back(pnls[i]);
+        if (!postTradesToSkip.empty()) {
+            for (const Size t : postTradesToSkip) {
+                postScenPnls.back() -= tradePnls[i][t];
+            }
+        }
+    }
+
+    // populate decorrelated pnls
+    vector<Real> callScenPnlsDecorrelated =
+        hisScenGen_->overlapping() ? QuantExt::decorrelateOverlappingPnls(callScenPnls, hisScenGen_->mporDays())
+        : callScenPnls;
+    vector<Real> postScenPnlsDecorrelated =
+        hisScenGen_->overlapping() ? QuantExt::decorrelateOverlappingPnls(postScenPnls, hisScenGen_->mporDays())
+        : postScenPnls;
+
+    // run exceedance test and write detail rows
     for (Size i = 0; i < pnls.size(); i++) {
         const auto& start = pnlScenDates[i].first;
         const auto& end = pnlScenDates[i].second;
 
-        // Deal with call and write report row
-        callScenPnl = pnls[i];
-        if (!callTradesToSkip.empty()) {
-            scenTradePnls = tradePnls[i];
-            for (const Size& t : callTradesToSkip) {
-                callScenPnl -= scenTradePnls[t];
-            }
-        }
-        if (callScenPnl > std::max(sr.callValue, btArgs_->exceptionThreshold_))
+        if (callScenPnls[i] > std::max(sr.callValue, btArgs_->exceptionThreshold_))
             sr.callExceptions++;
-
-        cPassFail = callScenPnl > std::max(sr.callValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
-        addDetailRow(reports, data, true, sr.callValue, start, end, isFull, callScenPnl, cPassFail);
-
-        // Deal with post and write report row
-        postScenPnl = pnls[i];
-        if (!postTradesToSkip.empty()) {
-            scenTradePnls = tradePnls[i];
-            for (const Size& t : postTradesToSkip) {
-                postScenPnl -= scenTradePnls[t];
-            }
-        }
-        if (-postScenPnl > std::max(sr.postValue, btArgs_->exceptionThreshold_))
+        if (-postScenPnls[i] > std::max(sr.postValue, btArgs_->exceptionThreshold_))
             sr.postExceptions++;
-        pPassFail = -postScenPnl > std::max(sr.postValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
-        addDetailRow(reports, data, false, sr.postValue, start, end, isFull, -postScenPnl, pPassFail);
+        if (callScenPnlsDecorrelated[i] > std::max(sr.callValue, btArgs_->exceptionThreshold_))
+            sr.callExceptionsDecorrelated++;
+        if (-postScenPnlsDecorrelated[i] > std::max(sr.postValue, btArgs_->exceptionThreshold_))
+            sr.postExceptionsDecorrelated++;
+
+        string cPassFail = callScenPnls[i] > std::max(sr.callValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
+        string pPassFail = -postScenPnls[i] > std::max(sr.postValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
+        string cPassFailDecorrelated =
+            callScenPnlsDecorrelated[i] > std::max(sr.callValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
+        string pPassFailDecorrelated =
+            -postScenPnlsDecorrelated[i] > std::max(sr.postValue, btArgs_->exceptionThreshold_) ? "fail" : "pass";
+
+        addDetailRow(reports, data, true, sr.callValue, start, end, isFull, callScenPnls[i], cPassFail,
+                     callScenPnlsDecorrelated[i], cPassFailDecorrelated);
+        addDetailRow(reports, data, false, sr.postValue, start, end, isFull, -postScenPnls[i], pPassFail,
+                     -postScenPnlsDecorrelated[i], pPassFailDecorrelated);
 
         // Add the trade level breakdown if requested. Note that we are clearly not recomputing the IM for the
         // trade - all we are doing is adding the P&L for each trade and the trade ID.
         if (detailTrd && !data.tradeGroup->allLevel()) {
             const auto& scenTradePnls = tradePnls[i];
-            QL_REQUIRE(tradeIds.size() == scenTradePnls.size(), "For trade level backtest detail report,"
-                                                                    << " the number of trades (" << tradeIds.size()
-                                                                    << ") does not equal the size of the trade level P&L"
-                                                                    << " container (" << scenTradePnls.size()
-                                                                    << ") on scenario date " << io::iso_date(start)
-                                                                    << ".");
+            QL_REQUIRE(tradeIds.size() == scenTradePnls.size(),
+                       "For trade level backtest detail report,"
+                           << " the number of trades (" << tradeIds.size()
+                           << ") does not equal the size of the trade level P&L"
+                           << " container (" << scenTradePnls.size() << ") on scenario date " << io::iso_date(start)
+                           << ".");
             for (Size j = 0; j < scenTradePnls.size(); ++j) {
                 if (std::find(callTradesToSkip.begin(), callTradesToSkip.end(), j) == callTradesToSkip.end())
-                    addDetailRow(reports, data, true, sr.callValue, start, end, isFull, scenTradePnls[j], cPassFail, tradeIds[j]);
+                    addDetailRow(reports, data, true, sr.callValue, start, end, isFull, scenTradePnls[j], cPassFail,
+                                 Null<Real>(), "na", tradeIds[j]);
                 if (std::find(postTradesToSkip.begin(), postTradesToSkip.end(), j) == postTradesToSkip.end())
-                    addDetailRow(reports, data, false, sr.postValue, start, end, isFull, -scenTradePnls[j], pPassFail, tradeIds[j]);
+                    addDetailRow(reports, data, false, sr.postValue, start, end, isFull, -scenTradePnls[j], pPassFail,
+                                 Null<Real>(), "na", tradeIds[j]);
             }
         }
     }
 
     LOG("Got " << sr.callExceptions << " Call exceptions from " << sr.observations << " observations.");
     LOG("Got " << sr.postExceptions << " Post exceptions from " << sr.observations << " observations.");
+    LOG("Got " << sr.callExceptionsDecorrelated << " Call exceptions from " << sr.observations << " observations (decorrelated).");
+    LOG("Got " << sr.postExceptionsDecorrelated << " Post exceptions from " << sr.observations << " observations (decorrelated).");
 
     // Now calculate the [red, amber] and [amber, green] bounds
-    if (hisScenGen_->mporDays() != 10) {
-        ALOG("SimmBacktest: MPOR days is " << hisScenGen_->mporDays());
+    if (hisScenGen_->overlapping()) {
+        try {
+            QL_REQUIRE(btArgs_->baselTrafficLight_, "No BaselTrafficLight data provided.");
+            auto baselTrafficLightMatrix = btArgs_->baselTrafficLight_->baselTrafficLightData();
+            auto it = baselTrafficLightMatrix.find(hisScenGen_->mporDays());
+            if (it == baselTrafficLightMatrix.end()) {
+                LOG("Couldn't parse BaselTrafficLight for " << hisScenGen_->mporDays()
+                                                            << " mporDays, defaulting to 10.");
+                it = baselTrafficLightMatrix.find(10);
+            }
+
+            ore::data::BaselTrafficLightData::ObservationData trafficLightObs;
+            if (it != baselTrafficLightMatrix.end())
+                trafficLightObs = it->second;
+            else
+                QL_FAIL("Could not find tabulated stop light bounds" );
+
+            sr.bounds = QuantExt::stopLightBoundsTabulated(btArgs_->ragLevels_, sr.observations,
+                                                           hisScenGen_->mporDays(), btArgs_->confidence_,
+                                                           trafficLightObs.observationCount, trafficLightObs.amberLimit, trafficLightObs.redLimit);
+        } catch (const std::exception& e) {
+            StructuredConfigurationWarningMessage("BaselTrafficLight data", "",
+                                                  "Error while retrieving tabulated stop light bounds.", e.what())
+                .log();
+        }
+        sr.boundsDecorrelated = QuantExt::stopLightBounds(btArgs_->ragLevels_, sr.observations, btArgs_->confidence_);
     } else {
-        sr.bounds = hisScenGen_->overlapping() ? QuantExt::stopLightBoundsTabulated(btArgs_->ragLevels_, sr.observations,
-                                                   hisScenGen_->mporDays(), btArgs_->confidence_)
-                        : QuantExt::stopLightBounds(btArgs_->ragLevels_, sr.observations, btArgs_->confidence_);
+        sr.bounds = sr.boundsDecorrelated =
+            QuantExt::stopLightBounds(btArgs_->ragLevels_, sr.observations, btArgs_->confidence_);
     }
 
     return sr;
@@ -324,6 +373,8 @@ void MarketRiskBacktest::createReports(const ext::shared_ptr<MarketRiskReport::R
         if (pnl) {
             for (const auto& t : pnlColumns())
                 pnl->addColumn(std::get<0>(t), std::get<1>(t), std::get<2>(t));
+            pnl->addColumn("DiscountSpecKey1", string());
+            pnl->addColumn("DiscountSpecKey2", string());
         }
     }
 
@@ -333,6 +384,8 @@ void MarketRiskBacktest::createReports(const ext::shared_ptr<MarketRiskReport::R
             pnlTrade->addColumn("TradeId", string());
             for (const auto& t : pnlColumns())
                 pnlTrade->addColumn(std::get<0>(t), std::get<1>(t), std::get<2>(t));
+            pnlTrade->addColumn("DiscountSpecKey1", string());
+            pnlTrade->addColumn("DiscountSpecKey2", string());
         }
     }
 }
@@ -405,6 +458,33 @@ void MarketRiskBacktest::addPnlRow(const QuantLib::ext::shared_ptr<BacktestRepor
         .add(currency.empty() || currency == calculationCurrency_ ? deltaPnl : deltaPnl / fxSpot)
         .add(currency.empty() || currency == calculationCurrency_ ? gammaPnl : gammaPnl / fxSpot)
         .add(currency.empty() ? calculationCurrency_ : currency);
+
+    // Append DiscountSpec column (from TodaysMarketParameters) if available and applicable
+    std::string discountSpecStr1;
+    if (todaysmarket_ && key_1.keytype == QuantExt::RiskFactorKey::KeyType::DiscountCurve) {
+        const auto& discMap = todaysmarket_->mapping(ore::data::MarketObject::DiscountCurve, ore::data::Market::defaultConfiguration);
+        auto it = discMap.find(key_1.name);
+        if (it != discMap.end()){
+            discountSpecStr1 = it->second;
+        }
+    }
+    if (!discountSpecStr1.empty())
+        report.add(discountSpecStr1);
+    else
+        report.add(string());
+
+    std::string discountSpecStr2;
+    if (todaysmarket_ && key_2.keytype == QuantExt::RiskFactorKey::KeyType::DiscountCurve) {
+        const auto& discMap = todaysmarket_->mapping(ore::data::MarketObject::DiscountCurve, ore::data::Market::defaultConfiguration);
+        auto it = discMap.find(key_2.name);
+        if (it != discMap.end()){
+            discountSpecStr2 = it->second;
+        }
+    }
+    if (!discountSpecStr2.empty())
+        report.add(discountSpecStr2);
+    else
+        report.add(string());
 }
 
 void BacktestPNLCalculator::writePNL(Size scenarioIdx, bool isCall, const RiskFactorKey& key_1, Real shift_1,

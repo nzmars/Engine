@@ -119,11 +119,12 @@ void YoYCapFloorHelper::createCapFloor() {
         yoyConvention_, DateGeneration::Backward, false);
 
     // YoY leg.
-    Leg yoyLeg = yoyInflationLeg(yoySchedule, paymentCalendar_, yoyIndex_, observationLag_)
+    
+    Leg yoyLeg = yoyInflationLeg(yoySchedule, paymentCalendar_, yoyIndex_, observationLag_, QuantLib::CPI::AsIndex)
         .withNotionals(1.0)
         .withPaymentDayCounter(yoyDayCount_)
         .withPaymentAdjustment(paymentConvention_);
-
+    
     // YoY cap floor.
     vector<Rate> strikes{ strike_ };
     yoyCapFloor_ = QuantLib::ext::make_shared<YoYInflationCapFloor>(type_, yoyLeg, strikes);
