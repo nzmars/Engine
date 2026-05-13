@@ -14,7 +14,7 @@ echo ORE_ROOT_DIR=%ORE_ROOT_DIR%
 
 set ORE_DIR=%ORE_ROOT_DIR%
 
-set PATH=D:\code\util\cmake-3.30.2-windows-x86_64\bin\;%PATH%
+set PATH=D:\code\util\cmake-4.3.1-windows-x86_64\bin\;%PATH%
 set PATH=%SWIG_DIR%;%PATH%
 
 cmake --version
