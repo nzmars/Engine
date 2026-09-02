@@ -352,3 +352,10 @@ Examples/**/pricingstats.csv
 
 .gitmodules
 
+##########################
+# Local tooling / editor state (fork-local, not for upstream)
+##########################
+.omc/
+*.swp
+*.swo
+*~

@@ -1,0 +1,9 @@
+# Keep line endings sane across Windows / Linux / WSL.
+# Without this, core.autocrlf=true rewrites shell scripts to CRLF and they
+# fail on Linux ( "#!/bin/bash\r" : no such file ).
+
+*.sh   text eol=lf
+*.bash text eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
