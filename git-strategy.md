@@ -129,7 +129,9 @@ git push --force-with-lease origin master
 
 ## 5. 주기적 upstream 동기화 절차 (체크리스트)
 
-upstream이 새 릴리스 태그(`v1.8.17.0` 등)를 내면:
+> **복붙용 런북은 [`UPSTREAM-SYNC.md`](UPSTREAM-SYNC.md) 에 별도 정리됨.** 아래는 개요.
+
+upstream이 새 릴리스 태그(`v1.8.17.0` 등)를 내거나 `upstream/master`가 움직이면:
 
 ```bash
 # 0. 작업 트리 깨끗하게: 진행 중 커스터마이징은 먼저 커밋
@@ -216,44 +218,26 @@ git reset --hard backup/pre-v1.8.17.0      # 이미 커밋했으면
 
 ---
 
-## 8. 즉시 조치 사항 (우선순위 순)
+## 8. 즉시 조치 사항 — 진행 현황
 
-1. **[보안] `origin` 원격 URL에서 PAT 제거.** ✅ 완료
-   ```bash
-   git remote set-url origin https://github.com/nzmars/Engine.git   # 실행됨
-   ```
-   `.git/config`에서 `ghp_...` 토큰이 제거됨. 인증은 이제 Git Credential Manager
-   (`credential.helper=manager`)가 처리 — 다음 push 때 브라우저 로그인 창이 한 번 뜸.
-   **남은 수동 작업 (브라우저):** GitHub → Settings → Developer settings →
-   Personal access tokens → 노출됐던 `ghp_OQsm...` 토큰을 **Delete/Revoke**.
-   자세한 인증 옵션은 §9 참고.
+1. **[보안] `origin` 원격 URL에서 PAT 제거.** ✅ 완료 (`git remote set-url origin https://github.com/nzmars/Engine.git`)
+   - ⚠️ **남은 수동 작업:** GitHub → Settings → Developer settings → Personal access tokens → 노출됐던 `ghp_OQsm...` 토큰 **Delete/Revoke**.
 
-2. **[유실 방지] 진행 중 커스터마이징을 지금 커밋.**
-   ```bash
-   git checkout -b custom/swig-curves
-   git add ORE-SWIG/QuantExt-SWIG/SWIG/qle_*.i ORE-SWIG/QuantExt-SWIG/SWIG/qle.i \
-           ORE-SWIG/QuantExt-SWIG/SWIG/qle_common.i ORE-SWIG/OREData-SWIG/SWIG/ored_conventions.i \
-           ORE-SWIG/setup.py ORE-SWIG/CMakeLists.txt
-   git commit -m "custom: expose QuantExt curve/interpolation classes to Python SWIG"
-   git add scripts/ CLAUDE.md git-strategy.md
-   git commit -m "build: script tweaks + repo docs"
-   git checkout master && git merge custom/swig-curves --no-ff
-   git push origin master
-   ```
-   (토픽 브랜치가 부담되면 `master`에 직접 2개 커밋으로 해도 됨.)
+2. **[유실 방지] 미커밋 커스터마이징 커밋.** ✅ 완료
+   - `custom: expose QuantExt curve/interpolation classes to Python SWIG`
+   - `build: make config scripts fully env-overridable`
+   - `build: make scripts/*.sh run on macOS as well as Linux`
+   - `docs: fork-maintenance git strategy, CLAUDE.md, line-ending rules`
 
-3. **[정리] 죽은 미러 브랜치 처리.**
-   ```bash
-   git push origin --delete upstream        # origin/upstream (14513 커밋 뒤처짐)
-   git branch -f vendor v1.8.16.0           # vendor 브랜치 신설 = 현재 추종 태그
-   git push origin vendor
-   ```
+3. **[정리] 브랜치 정리.** ✅ 완료
+   - `origin/upstream`(죽은 미러) 삭제, `vendor` 생성 후 `origin`에 push.
+   - `vendor`는 현재 `upstream/master`(post-v1.8.16.0)를 추종. 첫 동기화 완료.
+   - ⏳ `origin/develop`(옛 워크플로 잔재)는 미정 — 안 쓰면 `git push origin --delete develop`.
 
-4. **[.gitignore] 로컬 도구 산출물 무시.**
-   `.omc/`, `.todo.md.swp`, `bin/`(빌드 산출물이면), `build/` 등이 추적되지 않도록 `.gitignore` 확인·추가.
-   `CLAUDE.md` / `git-strategy.md` / `CUSTOMIZATIONS.md`는 **커밋 대상**(fork 유지보수 문서).
+4. **[.gitignore] 로컬 도구 산출물 무시.** ✅ 완료 (`.omc/`, `*.swp`, `*.swo`, `*~`)
 
-5. **[문서화] 이 문서를 저장소에 커밋**하고, `todo.md`는 이 문서를 가리키도록 축약하거나 삭제.
+5. **[git 인증 복구]** GCM에 캐시된 자격증명이 무효 → 일반 `git push` 실패.
+   `gh auth setup-git` 한 번 실행하면 git이 `gh` 토큰을 쓰도록 영구 설정됨. (§9, `UPSTREAM-SYNC.md` §0)
 
 ---
 
@@ -271,15 +255,22 @@ git reset --hard backup/pre-v1.8.17.0      # 이미 커밋했으면
 > **원칙: 자격증명(PAT·SSH 키)을 여러 사람이 공유하지 않는다.** 각자 자기 것으로 인증한다.
 > 이전 셋업(하나의 `ghp_...`를 원격 URL에 박아 공유)은 이 원칙 위반이었다.
 
-### 옵션 A — HTTPS + Git Credential Manager (현재 상태, Windows 권장)
+### 옵션 A — HTTPS + `gh` CLI 자격증명 (현재 상태, Windows 권장)
 
-```bash
-git remote set-url origin https://github.com/nzmars/Engine.git   # 이미 적용됨
-```
+원격 URL은 토큰 없는 https (`git remote set-url origin https://github.com/nzmars/Engine.git`, 적용됨).
 
-- 다음 push 때 GCM이 브라우저 로그인 창을 띄우고, 이후 자격증명을 OS 자격증명
-  저장소에 안전하게 보관. 2FA·토큰 갱신 자동 처리.
-- Git for Windows에 GCM이 기본 포함되어 별도 설치 불필요. `git config --get credential.helper` → `manager` 이면 준비 완료.
+> **현재 GCM(`credential.helper=manager`)에 캐시된 github.com 자격증명이 무효** →
+> 일반 `git push`가 `Invalid username or token`으로 실패한다. `gh` CLI는 정상
+> 인증돼 있으므로 한 번만:
+> ```bash
+> gh auth status            # 'Logged in ... nzmars' 확인
+> gh auth setup-git         # git이 gh 토큰을 쓰도록 영구 설정 (GCM은 fallback으로 유지)
+> ```
+> 이후 `git push`가 그냥 됨. 1회성으로만 쓰려면 push 앞에:
+> `git -c credential.helper= -c credential.helper='!gh auth git-credential' push ...`
+
+- GCM 자체를 고치려면: Windows 자격증명 관리자에서 `git:https://github.com` 항목
+  삭제 → 다음 push 때 브라우저 로그인 새로.
 
 ### 옵션 B — SSH (멀티 OS·서버에서 균일, 장기적으로 권장)
 
@@ -371,10 +362,10 @@ git submodule update --init --recursive
 
 ## 11. 요약 (TL;DR)
 
-- **브랜치**: `vendor`(upstream 릴리스 태그 순수 미러, 커밋 금지) + `master`(vendor + 커스터마이징, push 대상). 필요 시 `custom/*` 토픽 브랜치.
-- **병합**: `upstream/master`가 아니라 **릴리스 태그**를 `vendor`로 받아 `master`에 **merge**(옵션 A). force-push 없음. 이력이 지저분해지면 가끔 rebase로 정리.
-- **주기 동기화**: upstream 릴리스마다 §5 체크리스트 (백업 브랜치 → vendor 이동 → merge → 서브모듈 동기화 → 양 OS 빌드 검증 → push).
+- **브랜치**: `vendor`(upstream 순수 미러, 커밋 금지) + `master`(vendor + 커스터마이징, push 대상). 필요 시 `custom/*` 토픽 브랜치.
+- **병합**: `vendor`(새 릴리스 태그, 또는 태그 없으면 `upstream/master`)를 `master`에 **merge**(옵션 A). force-push 없음. 이력이 지저분해지면 가끔 rebase로 정리.
+- **주기 동기화**: [`UPSTREAM-SYNC.md`](UPSTREAM-SYNC.md) 런북 (백업 브랜치 → vendor 이동 → merge → 서브모듈 동기화 → 양 OS 빌드 검증 → push).
 - **커스터마이징**: 최대한 **신규 파일**로. 기존 파일 수정은 최소 훅만. upstream이 동등 기능 도입하면 내 것 폐기. `CLAUDE.md`를 매니페스트로.
-- **인증**: public 저장소라 **빌드만 하는 사람은 인증 불필요**(https clone). push하는 사람만 개인 SSH 키(옵션 B) 또는 HTTPS+GCM(옵션 A). 자격증명 공유 금지.
+- **인증**: public 저장소라 **빌드만 하는 사람은 인증 불필요**(https clone). push는 `gh auth setup-git`(현재 GCM 캐시 깨짐) 또는 개인 SSH 키. 자격증명 공유 금지.
 - **외부 빌드**: 스크립트는 전부 env 오버라이드 가능. 보통 `BOOST_ROOT`만 설정하면 `build_msvc.bat`/`build_linux.sh` → `build_swig.*` 로 wheel 생성. §10.
-- **지금 당장**: ① ~~원격 URL PAT 제거~~ ✅ + GitHub에서 토큰 revoke(수동) ② 미커밋 커스터마이징 커밋 ③ `origin/upstream` 삭제 + `vendor` 생성 ④ `.gitignore` 정비.
+- **진행 현황**(§8): ①PAT 제거 ✅ (토큰 revoke만 수동) ②커스터마이징 커밋 ✅ ③`origin/upstream` 삭제 + `vendor` 생성 + 첫 동기화 ✅ ④`.gitignore` ✅ ⑤`gh auth setup-git` 미실행.
