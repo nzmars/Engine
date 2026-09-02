@@ -68,8 +68,8 @@ if(ORE_USE_ZLIB)
     target_compile_definitions(OREP PRIVATE ORE_USE_ZLIB)
 endif()
 
-# On windows, do not tell the build which python libs to use.  It automatically 
-# looks for python release libs, even in debug, and invoking 
+# On windows, do not tell the build which python libs to use.  It automatically
+# looks for python release libs, even in debug, and invoking
 # target_link_libraries(OREP PRIVATE Python::Python) breaks the debug build.
 if(MSVC)
     target_include_directories(OREP PRIVATE ${Python_INCLUDE_DIRS})

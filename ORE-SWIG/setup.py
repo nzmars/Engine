@@ -230,12 +230,20 @@ class my_build_ext(build_ext):
                             ('NDEBUG', None), ('_WINDOWS', None),
                             ('NOMINMAX', None)]
             # ORE and QuantLib specific flags
-            self.define += [('QL_ENABLE_SESSIONS', None), ('QL_USE_STD_ANY', None), ('QL_FASTER_LAZY_OBJECTS', None), ('QL_USE_STD_OPTIONAL', None)]
+            self.define += [('QL_ENABLE_SESSIONS', None), ('QL_ENABLE_TRACING', None), ('QL_USE_STD_ANY', None),
+                            ('QL_USE_STD_CLASSES', None), ('QL_USE_STD_OPTIONAL', None),
+                            ('QL_USE_STD_SHARED_PTR', None), ('QL_FASTER_LAZY_OBJECTS', None)]
             if 'ORE_USE_ZLIB' in os.environ:
                 self.define += [('ORE_USE_ZLIB', None)]
             extra_compile_args = ['/GR', '/FD', '/Zm250', '/EHsc', '/bigobj', '/std:c++20', '/wd4996' ]
             extra_link_args = ['/subsystem:windows', machinetype]
-            self.libraries = [ 'advapi32' ]
+            self.libraries = [
+                'OREAnalytics-x64-mt-s',
+                'OREData-x64-mt-s',
+                'QuantExt-x64-mt-s',
+                'QuantLib-x64-mt-s',
+                'advapi32'
+            ]
 
             if self.debug:
                 if self.static or 'ORE_STATIC_RUNTIME' in os.environ:

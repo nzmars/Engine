@@ -54,6 +54,24 @@ if (PyBool_Check($input) || Py_None == $input)
 else
 	$1 = 0;
 }
+
+// boost::optional<QuantLib::Period> 입력 typemap
+%typemap(in) boost::optional<QuantLib::Period> {
+    if ($input == Py_None) {
+        $1 = boost::optional<QuantLib::Period>(); // None은 boost::none으로 변환
+    } else {
+        // Python에서 QuantLib::Period를 받는 로직 필요 (이 예시는 단순화된 형태)
+        QuantLib::Period period;
+        if (PyObject_TypeCheck($input, &PyLong_Type)) {
+            period = QuantLib::Period(PyLong_AsLong($input), QuantLib::Months); // 예시로 Months 사용
+        } else {
+            PyErr_SetString(PyExc_TypeError, "Invalid input for QuantLib::Period");
+            return NULL;
+        }
+        $1 = boost::optional<QuantLib::Period>(period);
+    }
+}
+
 #endif
 
 #endif

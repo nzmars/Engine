@@ -487,7 +487,15 @@ class CrossCcyBasisSwapConvention : public Convention {
     CrossCcyBasisSwapConvention(const std::string& id,const std::string& strSettlementDays,
                                 const std::string& strSettlementCalendar, const std::string& strRollConvention,
                                 const std::string& flatIndex, const std::string& spreadIndex,
-                                const std::string& strEom = "");
+                                const std::string& strEom = "",
+                                const std::string& strIsResettable = "",
+                                const std::string& strFlatIndexIsResettable = "",
+                                const std::string& strFlatTenor = "",
+                                const std::string& strSpreadTenor = "",
+                                const std::string& strIncludeSpread = "",
+                                const std::string& strPaymentLag = "",
+                                const std::string& strFlatPaymentLag = ""
+                                );
     Natural settlementDays() const;
     const Calendar& settlementCalendar() const;
     BusinessDayConvention rollConvention() const;
@@ -496,6 +504,12 @@ class CrossCcyBasisSwapConvention : public Convention {
     const std::string& flatIndexName() const;
     const std::string& spreadIndexName() const;
     bool eom() const;
+    bool isResettable() const;
+    bool flatIndexIsResettable() const;
+    const Period& flatTenor() const;
+    const Period& spreadTenor() const;
+    Size paymentLag() const;
+    Size flatPaymentLag() const;
     void fromXML(ore::data::XMLNode* node) override;
     ore::data::XMLNode* toXML(ore::data::XMLDocument& doc) const override;
     void build() override;

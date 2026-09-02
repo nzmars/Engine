@@ -49,6 +49,9 @@
 %include qle_creditdefaultswap.i
 %include qle_averageoisratehelper.i
 %include qle_processes.i
+%include qle_interpolation.i
+%include qle_zerocurve.i
+%include qle_piecewiseyieldcurve.i
 
 // CrossCcyFixFloatSwapHelper is intentionally not exposed yet.
 
