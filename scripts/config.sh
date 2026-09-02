@@ -39,9 +39,11 @@ export BOOST_LIB="${BOOST_LIB:-$BOOST/stage/lib}"
 # flag_use_vcpkg: 1 = use vcpkg (../vcpkg), 0 = use Boost at BOOST_ROOT
 : "${flag_use_vcpkg:=0}"
 
-# Parallel build jobs (default: half the cores, min 1; override with CPU_N=N)
+# Parallel build jobs (default: half the cores, min 1; override with CPU_N=N).
+# nproc = Linux; sysctl hw.ncpu = macOS/BSD.
 _cores="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 : "${CPU_N:=$(( _cores > 1 ? _cores / 2 : 1 ))}"
+unset _cores
 
 echo "ORE_ROOT_DIR=$ORE_ROOT_DIR"
 echo "ORE_SWIG_DIR=$ORE_SWIG_DIR"
